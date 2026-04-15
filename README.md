@@ -72,7 +72,8 @@
 ![ERD Diagram](images/ERD_Diagram)
 
 ### Data Structure Diagram (DSD) / מבנה סכמה
-הסכמה הלוגית באה לידי ביטוי בקובץ ה-`createTables.sql` הנמצא במאגר. היא כוללת את כל מפתחות ה-PK וה-FK, אילוצי CHECK (כגון וידוא שזמן סיום מאוחר מזמן התחלה, תקינות מדדי לחץ דם, ועוד).
+
+![SSD Diagram](images/SSD.png)
 
 ---
 
