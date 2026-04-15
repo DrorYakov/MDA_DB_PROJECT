@@ -109,7 +109,7 @@
 תהליך הגיבוי והשחזור של בסיס הנתונים בוצע כדי להבטיח זמינות נתונים במקרה של קריסת מערכת:
 
 **צילום מסך של תהליך ביצוע הגיבוי (Backup):**
-![Backup Screenshot](./images/backup_screenshot.png) *(יש להחליף בתמונה שלכם)*
+![Backup Screenshot](images/Backup.png)
 
 **צילום מסך של תהליך שחזור הנתונים (Restore):**
-![Restore Screenshot](./images/restore_screenshot.png) *(יש להחליף בתמונה שלכם)*
+![Restore Screenshot](images/Restore.png)
