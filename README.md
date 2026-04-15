@@ -46,23 +46,22 @@
 
 מסכי המערכת נוצרו בעזרת כלי AI כדי להמחיש את ממשק המשתמש (UI) של המוקדן והצוות הרפואי.
 
-🔗 **קישור לאתר ב-AI STUDIO:** `[הכנס כאן את הקישור לאתר שיצרתם]`
-
+🔗 **קישור לאתר ב-AI STUDIO:** 'https://ai.studio/apps/64ec0f00-3fc3-4032-9eda-76dc68e13f70'
 ### 1. דשבורד אירועים פעילים (Active Incidents)
 תצוגה מרכזית למוקדן המציגה את כל האירועים הפעילים, זמן שחלף, צוותים משוגרים וסטטוס (קריטי/יציב).
-![Active Incidents](./images/Screenshot_2026-04-14_160113.png)
+![Active Incidents](images/ActiveIncidents)
 
 ### 2. פתיחת אירוע חדש (New Incident)
 טופס הזנת נתונים ראשוניים מקריאת החירום - הזנת פרטי מתקשר וקרבתו למטופל.
-![New Incident](./images/Screenshot_2026-04-14_160124.jpg)
+![New Incident](images/NewIncidents)
 
 ### 3. מסך מעקב וניטור רפואי (Incident Monitor)
 מסך המציג בזמן אמת את פרטי המטופל, מדדים חיוניים (Vitals), אק"ג, ופרטי השיגור של הניידת (MICU).
-![Incident Monitor](./images/Screenshot_2026-04-14_160138.jpg)
+![Incident Monitor](images/IncidentMonitor)
 
 ### 4. דוח העברה לבית חולים (Hospital Transfer Report)
 סיכום כלל הפעולות שבוצעו בשטח (CPR, IV, Medication) והכנת הנתונים להעברה לצוות המיון בבית החולים היעד.
-![Transfer Report](./images/Screenshot_2026-04-14_160144.png)
+![Transfer Report](images/HospitalTransferReport)
 
 ---
 
@@ -70,7 +69,7 @@
 
 ### Entity Relationship Diagram (ERD)
 התרשים מציג את הישויות במערכת, התכונות שלהן והקשרים ביניהן. 
-![ERD Diagram](./images/image_7259eb.png)
+![ERD Diagram](images/ERD_Diagram)
 
 ### Data Structure Diagram (DSD) / מבנה סכמה
 הסכמה הלוגית באה לידי ביטוי בקובץ ה-`createTables.sql` הנמצא במאגר. היא כוללת את כל מפתחות ה-PK וה-FK, אילוצי CHECK (כגון וידוא שזמן סיום מאוחר מזמן התחלה, תקינות מדדי לחץ דם, ועוד).
