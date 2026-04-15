@@ -1,0 +1,44 @@
+Emergency Incident Management System (MDA-Style)
+
+1. Introduction
+The Emergency Incident Management System is a comprehensive, centralized platform designed to facilitate the rapid, organized, and data-driven response to medical emergencies. Primarily tailored for the Dispatcher role, the system acts as the operational nervous system of the emergency response network. It empowers dispatchers to efficiently log incoming emergency calls, deploy appropriate medical units, monitor live patient vitals telemetry, and seamlessly coordinate the final handover of patients to receiving medical facilities.
+
+2. System Scope
+The scope of the system covers the entire lifecycle of a pre-hospital medical emergency. Its primary functionalities include:
+Incident Intake: Rapid, structured collection of caller information, precise location data, and initial medical complaint categorization.
+Resource Tracking & Dispatch: Assigning and tracking the status of mobile intensive care units (MICUs) and basic life support (BLS) ambulances.
+Medical Monitoring: Real-time visualization of patient telemetry (Heart Rate, Blood Pressure, SpO2, Temperature, ECG) transmitted from the field.
+Hospital Transfer & Reporting: Documenting field procedures, generating transfer summaries, and coordinating the handover to receiving hospitals.
+
+3. Functional Requirements & Entity Interactions
+To support the system's scope, the underlying relational database is built upon 10 core entities that interact dynamically:
+Incidents: The central entity of the system. Every event generates a unique Incident ID. It acts as the primary foreign key hub for Callers, Locations, and DispatchUnits.
+Callers: Stores contact information and relationship to the patient. A Caller can report multiple Incidents over time (1:N relationship).
+Locations: Standardized geographical data (City, Street, Building, Access Codes). Linked to Incidents (1:N).
+Patients: Stores demographic and historical medical data (allergies, chronic conditions). Linked to Incidents (1:N, as one incident may involve multiple patients).
+DispatchUnits: Represents the physical ambulances (e.g., MICU-42). Linked to Incidents to track which vehicle responded.
+CrewMembers: Paramedics and EMTs. Linked to DispatchUnits via a junction table to represent shift assignments (M:N).
+Measurements (Vitals): Time-series clinical data. Linked to both Patients and Incidents (1:N), allowing the system to track how a patient's condition evolves during a specific transport.
+Procedures: A catalog of medical interventions (CPR, Intubation, IV Access).
+Incident_Procedures: A junction entity linking Incidents and Procedures (M:N), recording exactly which interventions were performed during a specific event.
+Hospitals (Transfers): Receiving medical facilities. Linked to Incidents to log the final destination and ETA of the patient transfer.
+
+4. User Interface Description
+The application features a persistent right-aligned navigation sidebar and is divided into 4 primary screens:
+Dashboard (index.html): The operational overview. It displays a data grid of all active incidents, showing ID, Type, Location, Time Elapsed, Assigned Unit, and Status (Critical/Stable).
+Navigation Logic: Clicking an Incident ID routes the dispatcher to the Monitor screen for that specific event. A prominent button routes to the New Incident form.
+New Incident (new-incident.html): A multi-step wizard designed for high-stress data entry.
+Step 1: Caller Info.
+Step 2: Location Details (utilizing granular fields for precise routing).
+Step 3: Incident Type & Severity.
+Navigation Logic: Upon submission, the system generates the incident and returns the user to the Dashboard.
+Incident Monitor (monitor.html): A split-screen tactical view for active calls. The left pane displays static Patient Information alongside live, pulsating Medical Measurements. The right pane displays Dispatch Details (Unit, Crew, Location) and a chronological event timeline.
+Navigation Logic: Contains a direct action button to "Proceed to Hospital Transfer" once the unit is en route to a facility.
+Hospital Transfer (transfer.html): The final reporting interface. It allows the dispatcher to select a receiving Hospital, check off Procedures Performed from a grid, and review the auto-generated Transfer Summary.
+Navigation Logic: Upon transmission, a success state is shown, and the user is automatically redirected back to the main Dashboard.
+5. Design Decisions & Database Justifications
+The database architecture was designed with strict adherence to relational theory and data integrity principles:
+Enforcement of Third Normal Form (3NF): The database schema is normalized to 3NF to eliminate data redundancy and prevent insertion, update, and deletion anomalies. For example, Crew Member names are not stored directly in the Incident table; instead, the Incident references a DispatchUnit, which references its CrewMembers. This ensures that if an EMT's certification level changes, it only needs to be updated in one place.
+Locations as a Separate Entity: Instead of storing address strings directly within the Incident table, Locations are abstracted into their own entity. Justification: This allows for geospatial querying, standardizes address formats, and prevents duplicate data entry for frequent emergency locations (e.g., nursing homes or specific highway mile markers). It also enables the system to flag "hazard" locations historically.
+Separation of Measurements from Patients: Vital signs are modeled as a separate entity rather than attributes of the Patient. Justification: Medical telemetry is time-series data. A patient's heart rate changes minute-by-minute. A 1:N relationship allows the database to store an infinite history of timestamped measurements, enabling the UI to render trend graphs (ECG rhythms) rather than just a single, overwritten static value.
+Decoupling Callers from Patients: Justification: In emergency medicine, the person reporting the incident is frequently a bystander, security guard, or family member—not the patient themselves. Merging these concepts would violate the logical separation of concerns. By separating them, the system can accurately model scenarios like a single security guard (one Caller) reporting a multi-vehicle collision (multiple Patients).
