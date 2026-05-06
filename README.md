@@ -123,10 +123,11 @@
 
 ### קבצי ההגשה (תיקיית `שלב ב`)
 
-- **`Queries.sql`**: כל שאילתות ה-`SELECT` / `DELETE` / `UPDATE`
-- **`Constraints.sql`**: הוספת 3 אילוצים באמצעות `ALTER TABLE`
-- **`RollbackCommit.sql`**: דוגמאות `ROLLBACK` ו-`COMMIT` עם הצגת מצב בסיס הנתונים בכל שלב
-- **`Index.sql`**: הוספת 3 אינדקסים + בדיקת זמני ריצה לפני/אחרי
+- **`Stage_2/Queries.sql`**: שאילתות `DELETE` ו-`UPDATE`
+- **`Stage_2/query_1..query_8/query.sql`**: שאילתות `SELECT` (כולל 4 כפולות בשתי צורות)
+- **`Stage_2/Constraints.sql`**: הוספת 3 אילוצים באמצעות `ALTER TABLE`
+- **`Stage_2/RollbackCommit.sql`**: דוגמת `ROLLBACK` (ודוגמת `COMMIT` תתווסף)
+- **`Stage_2/Index.sql`**: הוספת 3 אינדקסים + בדיקת זמני ריצה לפני/אחרי
 - **`backup2`**: קובץ גיבוי מעודכן לאחר השינויים
 
 ### שאילתות SELECT (8 סה״כ)
@@ -137,123 +138,211 @@
 
 ##### SELECT כפולה 1 — תיאור בעברית
 
-- **תיאור**: _(להשלים תיאור קצר וברור בעברית)_
+- **תיאור**: דוח ניהולי המציג **עומס אירועים חמורים לפי עיר**: עבור כל עיר מוצגים מספר האירועים החמורים, ממוצע חומרה, ומיון לפי כמות אירועים.
 - **שאילתה – צורה א׳**:
 ```sql
--- TODO: הדביקו כאן את שאילתת SELECT (צורה א׳)
+SELECT L.City_, COUNT(I.Incident_ID_) AS Total_Severe_Incidents, AVG(I.Severity_Level_) AS Avg_Severity
+FROM INCIDENTS I
+JOIN LOCATIONS L ON I.Incident_ID_ = L.Incident_ID_
+WHERE I.Severity_Level_ >= 3
+GROUP BY L.City_
+HAVING COUNT(I.Incident_ID_) > 5
+ORDER BY Total_Severe_Incidents DESC;
 ```
-- **צילום הרצה (צורה א׳)**: _(להדביק תמונה כאן)_
-- **צילום תוצאה (עד 5 שורות) (צורה א׳)**: _(להדביק תמונה כאן)_
+![Backup Screenshot](Stage_2\query_1\Screenshot 2026-04-29 125611.png)
 
 - **שאילתה – צורה ב׳**:
 ```sql
--- TODO: הדביקו כאן את שאילתת SELECT (צורה ב׳)
+SELECT City_, COUNT(Location_ID_) AS Total_Severe_Incidents
+FROM LOCATIONS
+WHERE Incident_ID_ IN (SELECT Incident_ID_ FROM INCIDENTS WHERE Severity_Level_ >= 3)
+GROUP BY City_
+HAVING COUNT(Location_ID_) > 5
+ORDER BY Total_Severe_Incidents DESC;
 ```
-- **צילום הרצה (צורה ב׳)**: _(להדביק תמונה כאן)_
-- **צילום תוצאה (עד 5 שורות) (צורה ב׳)**: _(להדביק תמונה כאן)_
+![Backup Screenshot](images/Backup.png)
 
 - **הבדלים ויעילות**:
-  - **מה ההבדל בין צורה א׳ לצורה ב׳**: _(להשלים)_
-  - **מה יותר יעיל ולמה**: _(להשלים, כולל התייחסות לתוכנית ביצוע/אינדקסים/קינון/חישובים)_
+  - **מה ההבדל בין צורה א׳ לצורה ב׳**: צורה א׳ משתמשת ב-`JOIN` ומחזירה גם ממוצע חומרה; צורה ב׳ משתמשת בתת-שאילתה עם `IN` ומבצעת ספירה על טבלת `LOCATIONS`.
+  - **מה יותר יעיל ולמה**: ברוב המקרים צורה א׳ יעילה יותר כי האופטימייזר יכול לבחור תכנית חיבור יעילה (`Hash Join`/`Merge Join`) ולבצע אגרגציה לאחר החיבור. בצורה ב׳ יש תת-שאילתה שיכולה להוביל ל־`Subquery Scan`/חומרה של `IN` (תלוי DB), ולעיתים פחות מנצלת אינדקסים על צירוף.
 
 ##### SELECT כפולה 2 — תיאור בעברית
 
-- **תיאור**: _(להשלים)_
+- **תיאור**: דוח קליני המציג **מטופלים עם דופק חריג (Pulse > 120) במהלך השנה הנוכחית** כולל שם מלא וספק ביטוח.
 - **שאילתה – צורה א׳**:
 ```sql
--- TODO
+SELECT P.First_Name_ || ' ' || P.Last_Name_ AS Full_Name, P.Insurance_Provider_
+FROM PATIENTS P
+JOIN MEDICAL_MEASUREMENTS M ON P.Patient_ID_ = M.Patient_ID_
+WHERE M.Pulse_ > 120 
+  AND EXTRACT(YEAR FROM M.Recorded_At_) = EXTRACT(YEAR FROM CURRENT_DATE)
+GROUP BY P.First_Name_, P.Last_Name_, P.Insurance_Provider_;
 ```
-- **צילום הרצה (צורה א׳)**: _(להדביק תמונה כאן)_
-- **צילום תוצאה (עד 5 שורות) (צורה א׳)**: _(להדביק תמונה כאן)_
+![Backup Screenshot](images/Backup.png)
+
 - **שאילתה – צורה ב׳**:
 ```sql
--- TODO
+SELECT First_Name_ || ' ' || Last_Name_ AS Full_Name, Insurance_Provider_
+FROM PATIENTS P
+WHERE EXISTS (
+    SELECT 1 
+    FROM MEDICAL_MEASUREMENTS M 
+    WHERE M.Patient_ID_ = P.Patient_ID_ 
+      AND M.Pulse_ > 120 
+      AND EXTRACT(YEAR FROM M.Recorded_At_) = EXTRACT(YEAR FROM CURRENT_DATE)
+)
+GROUP BY P.First_Name_, P.Last_Name_, P.Insurance_Provider_;
 ```
-- **צילום הרצה (צורה ב׳)**: _(להדביק תמונה כאן)_
-- **צילום תוצאה (עד 5 שורות) (צורה ב׳)**: _(להדביק תמונה כאן)_
+![Backup Screenshot](images/Backup.png)
+
 - **הבדלים ויעילות**:
-  - **הבדל**: _(להשלים)_
-  - **יעילות**: _(להשלים)_
+  - **הבדל**: צורה א׳ עושה `JOIN` ישיר על טבלת המדדים ועלולה להחזיר/לעבד ריבוי שורות לכל מטופל; צורה ב׳ משתמשת ב-`EXISTS` ובודקת רק קיום מדד מתאים (אפשר “לעצור מוקדם”).
+  - **יעילות**: לרוב `EXISTS` יעיל יותר כשהמטרה היא “יש/אין” כי ניתן לבצע `Semi-Join` ולצמצם סריקות. `JOIN` מתאים אם רוצים אגרגציות/חישובים על המדדים עצמם.
 
 ##### SELECT כפולה 3 — תיאור בעברית
 
-- **תיאור**: _(להשלים)_
+- **תיאור**: דוח למשרד הבריאות: **בתי חולים שלא קלטו אף מטופל בשנה הנוכחית** (לא הופיעו ב־`TRANSFER_SUMMARIES`).
 - **שאילתה – צורה א׳**:
 ```sql
--- TODO
+SELECT H.Hospital_Name_, H.City_
+FROM HOSPITALS H
+LEFT JOIN TRANSFER_SUMMARIES TS 
+  ON H.Hospital_ID_ = TS.Hospital_ID_ 
+  AND EXTRACT(YEAR FROM TS.Arrival_At_Hospital_Time_) = EXTRACT(YEAR FROM CURRENT_DATE)
+WHERE TS.Transfer_ID_ IS NULL;
 ```
-- **צילום הרצה (צורה א׳)**: _(להדביק תמונה כאן)_
-- **צילום תוצאה (עד 5 שורות) (צורה א׳)**: _(להדביק תמונה כאן)_
+![Backup Screenshot](images/Backup.png)
+
 - **שאילתה – צורה ב׳**:
 ```sql
--- TODO
+SELECT Hospital_Name_, City_
+FROM HOSPITALS
+WHERE Hospital_ID_ NOT IN (
+    SELECT Hospital_ID_ 
+    FROM TRANSFER_SUMMARIES 
+    WHERE EXTRACT(YEAR FROM Arrival_At_Hospital_Time_) = EXTRACT(YEAR FROM CURRENT_DATE)
+);
 ```
-- **צילום הרצה (צורה ב׳)**: _(להדביק תמונה כאן)_
-- **צילום תוצאה (עד 5 שורות) (צורה ב׳)**: _(להדביק תמונה כאן)_
+![Backup Screenshot](images/Backup.png)
+
 - **הבדלים ויעילות**:
-  - **הבדל**: _(להשלים)_
-  - **יעילות**: _(להשלים)_
+  - **הבדל**: צורה א׳ משתמשת ב־`LEFT JOIN ... IS NULL` (אנטי-ג'וין). צורה ב׳ משתמשת ב־`NOT IN` עם תת-שאילתה.
+  - **יעילות**: בדרך כלל `LEFT JOIN ... IS NULL` או `NOT EXISTS` עדיפים על `NOT IN` (במיוחד כשיש `NULL`s בתת-שאילתה שעלולים לשנות לוגיקה). האופטימייזר לרוב ממיר `LEFT JOIN ... IS NULL` לאנטי-ג'וין יעיל.
 
 ##### SELECT כפולה 4 — תיאור בעברית
 
-- **תיאור**: _(להשלים)_
+- **תיאור**: דוח למוקדן המציג **כמות קריאות לכל מדווח לפי שנה וחודש**, כולל שם מדווח וטלפון, ומסנן מדווחים עם יותר מ־2 קריאות בחודש.
 - **שאילתה – צורה א׳**:
 ```sql
--- TODO
+SELECT C.Full_Name_, C.Phone_Number_, 
+       EXTRACT(YEAR FROM I.Call_Start_Timestamp_) AS Call_Year, 
+       EXTRACT(MONTH FROM I.Call_Start_Timestamp_) AS Call_Month,
+       COUNT(I.Incident_ID_) AS Total_Calls
+FROM CALLERS C
+JOIN INCIDENTS I ON C.Caller_ID_ = I.Caller_ID_
+GROUP BY C.Full_Name_, C.Phone_Number_, Call_Year, Call_Month
+HAVING COUNT(I.Incident_ID_) > 2;
 ```
-- **צילום הרצה (צורה א׳)**: _(להדביק תמונה כאן)_
-- **צילום תוצאה (עד 5 שורות) (צורה א׳)**: _(להדביק תמונה כאן)_
+![Backup Screenshot](images/Backup.png)
+
 - **שאילתה – צורה ב׳**:
 ```sql
--- TODO
+SELECT Full_Name_, Phone_Number_, Call_Year, Call_Month, Total_Calls
+FROM (
+    SELECT C.Full_Name_, C.Phone_Number_, 
+           EXTRACT(YEAR FROM I.Call_Start_Timestamp_) AS Call_Year, 
+           EXTRACT(MONTH FROM I.Call_Start_Timestamp_) AS Call_Month,
+           COUNT(I.Incident_ID_) AS Total_Calls
+    FROM CALLERS C
+    JOIN INCIDENTS I ON C.Caller_ID_ = I.Caller_ID_
+    GROUP BY C.Full_Name_, C.Phone_Number_, EXTRACT(YEAR FROM I.Call_Start_Timestamp_), EXTRACT(MONTH FROM I.Call_Start_Timestamp_)
+) AS MonthlyStats
+WHERE Total_Calls > 2;
 ```
-- **צילום הרצה (צורה ב׳)**: _(להדביק תמונה כאן)_
-- **צילום תוצאה (עד 5 שורות) (צורה ב׳)**: _(להדביק תמונה כאן)_
+![Backup Screenshot](images/Backup.png)
+
 - **הבדלים ויעילות**:
-  - **הבדל**: _(להשלים)_
-  - **יעילות**: _(להשלים)_
+  - **הבדל**: צורה א׳ מסננת עם `HAVING` על האגרגציה. צורה ב׳ בונה טבלה נגזרת (Derived Table) ואז מסננת ב־`WHERE`.
+  - **יעילות**: לרוב האופטימייזר מפיק תכנית דומה, אבל צורה א׳ ישירה וברורה יותר; צורה ב׳ שימושית כשצריך להמשיך לבצע סינונים/חיבורים נוספים על התוצאה האגרגטיבית.
 
 #### 4 שאילתות SELECT נוספות (ללא כפילות)
 
 ##### SELECT 5 — תיאור בעברית
 
-- **תיאור**: _(להשלים)_
+- **תיאור**: מסך פרמדיק/רופא: **סיכום מדדים קריטיים לפי מטופל בחודש הנוכחי** (סטורציה מינימלית, דופק מקסימלי) כולל חישוב גיל, סינון מטופלים עם סטורציה מתחת ל־90 ומיון לפי הנמוכה ביותר.
 - **שאילתה**:
 ```sql
--- TODO
+SELECT 
+    P.First_Name_ || ' ' || P.Last_Name_ AS Patient_Name,
+    EXTRACT(YEAR FROM CURRENT_DATE) - EXTRACT(YEAR FROM P.Birth_Date_) AS Patient_Age,
+    MIN(M.Oxygen_Saturation_) AS Lowest_Oxygen,
+    MAX(M.Pulse_) AS Highest_Pulse
+FROM PATIENTS P
+JOIN MEDICAL_MEASUREMENTS M ON P.Patient_ID_ = M.Patient_ID_
+WHERE EXTRACT(MONTH FROM M.Recorded_At_) = EXTRACT(MONTH FROM CURRENT_DATE)
+GROUP BY P.First_Name_, P.Last_Name_, P.Birth_Date_
+HAVING MIN(M.Oxygen_Saturation_) < 90
+ORDER BY Lowest_Oxygen ASC;
 ```
-- **צילום הרצה**: _(להדביק תמונה כאן)_
-- **צילום תוצאה (עד 5 שורות)**: _(להדביק תמונה כאן)_
+![Backup Screenshot](images/Backup.png)
+
 
 ##### SELECT 6 — תיאור בעברית
 
-- **תיאור**: _(להשלים)_
+- **תיאור**: מסך משגר/מנהל: **“מיקומים חמים” של אירועים פעילים** לפי עיר ורחוב, כולל כמות אירועים פעילים, חומרה מקסימלית, וזמן הקריאה הוותיק ביותר באזור.
 - **שאילתה**:
 ```sql
--- TODO
+SELECT 
+    L.City_,
+    L.Street_,
+    COUNT(I.Incident_ID_) AS Active_Incidents,
+    MAX(I.Severity_Level_) AS Highest_Severity,
+    MIN(I.Call_Start_Timestamp_) AS Oldest_Call_Time
+FROM INCIDENTS I
+JOIN LOCATIONS L ON I.Incident_ID_ = L.Incident_ID_
+WHERE I.Status_ IN ('Pending', 'Dispatched', 'On Scene')
+GROUP BY L.City_, L.Street_
+HAVING COUNT(I.Incident_ID_) >= 2
+ORDER BY Highest_Severity DESC, Active_Incidents DESC;
 ```
-- **צילום הרצה**: _(להדביק תמונה כאן)_
-- **צילום תוצאה (עד 5 שורות)**: _(להדביק תמונה כאן)_
+![Backup Screenshot](images/Backup.png)
+
 
 ##### SELECT 7 — תיאור בעברית
 
-- **תיאור**: _(להשלים)_
+- **תיאור**: מסך מנהל רפואי: **עומס על רופאים מקבלים בבתי חולים** בשנה הנוכחית, כולל בית חולים/עיר/שם רופא, מספר מטופלים שקיבל ותאריך הגעה אחרון.
 - **שאילתה**:
 ```sql
--- TODO
+SELECT 
+    H.Hospital_Name_,
+    H.City_,
+    TS.Receiving_Physician_ AS Doctor_Name,
+    COUNT(TS.Transfer_ID_) AS Total_Patients_Received,
+    MAX(TS.Arrival_At_Hospital_Time_) AS Last_Transfer_Date
+FROM HOSPITALS H
+JOIN TRANSFER_SUMMARIES TS ON H.Hospital_ID_ = TS.Hospital_ID_
+WHERE EXTRACT(YEAR FROM TS.Arrival_At_Hospital_Time_) = EXTRACT(YEAR FROM CURRENT_DATE)
+GROUP BY H.Hospital_Name_, H.City_, TS.Receiving_Physician_
+HAVING COUNT(TS.Transfer_ID_) > 5
+ORDER BY Total_Patients_Received DESC;
 ```
-- **צילום הרצה**: _(להדביק תמונה כאן)_
-- **צילום תוצאה (עד 5 שורות)**: _(להדביק תמונה כאן)_
+![Backup Screenshot](images/Backup.png)
+
 
 ##### SELECT 8 — תיאור בעברית
 
-- **תיאור**: _(להשלים)_
+- **תיאור**: דוח איכות: **פרוצדורות עם הצלחה גבוהה** כולל שם פרוצדורה, דירוג הצלחה, שם מטופל וחישוב גיל בזמן ביצוע הפרוצדורה, ומיון לפי גיל.
 - **שאילתה**:
 ```sql
--- TODO
+SELECT PP.Procedure_Name_, PP.Success_Rate_, P.First_Name_, P.Last_Name_,
+       EXTRACT(YEAR FROM PP.Performed_At_) - EXTRACT(YEAR FROM P.Birth_Date_) AS Patient_Age_At_Procedure
+FROM PROCEDURES_PERFORMED PP
+JOIN PATIENTS P ON PP.Patient_ID_ = P.Patient_ID_
+WHERE PP.Success_Rate_ = 'High'
+ORDER BY Patient_Age_At_Procedure ASC;
 ```
-- **צילום הרצה**: _(להדביק תמונה כאן)_
-- **צילום תוצאה (עד 5 שורות)**: _(להדביק תמונה כאן)_
+![Backup Screenshot](images/Backup.png)
+
 
 ### שאילתות DELETE (3 סה״כ)
 
@@ -261,10 +350,11 @@
 
 #### DELETE 1
 
-- **תיאור**: _(להשלים)_
+- **תיאור**: ארכוב/ניקוי נתונים: מחיקת מדדים רפואיים ישנים מאוד (שנת הקלטה לפני 2014) מטבלת `MEDICAL_MEASUREMENTS`.
 - **שאילתה**:
 ```sql
--- TODO
+DELETE FROM MEDICAL_MEASUREMENTS
+WHERE EXTRACT(YEAR FROM Recorded_At_) < 2014;
 ```
 - **צילום מצב לפני**: _(להדביק תמונה כאן)_
 - **צילום הרצה**: _(להדביק תמונה כאן)_
@@ -272,10 +362,11 @@
 
 #### DELETE 2
 
-- **תיאור**: _(להשלים)_
+- **תיאור**: מחיקת מדווחים (Callers) שאין להם אף אירוע מקושר (ללא היסטוריית דיווח) כדי לשמור על בסיס נתונים נקי.
 - **שאילתה**:
 ```sql
--- TODO
+DELETE FROM CALLERS
+WHERE Caller_ID_ NOT IN (SELECT DISTINCT Caller_ID_ FROM INCIDENTS);
 ```
 - **צילום מצב לפני**: _(להדביק תמונה כאן)_
 - **צילום הרצה**: _(להדביק תמונה כאן)_
@@ -283,10 +374,11 @@
 
 #### DELETE 3
 
-- **תיאור**: _(להשלים)_
+- **תיאור**: מחיקת רשומות מיקום של אירועים שבוטלו (`Cancelled`) כדי להימנע מנתוני מיקום מיותרים שאינם רלוונטיים לתפעול.
 - **שאילתה**:
 ```sql
--- TODO
+DELETE FROM LOCATIONS
+WHERE Incident_ID_ IN (SELECT Incident_ID_ FROM INCIDENTS WHERE Status_ = 'Cancelled');
 ```
 - **צילום מצב לפני**: _(להדביק תמונה כאן)_
 - **צילום הרצה**: _(להדביק תמונה כאן)_
@@ -298,10 +390,18 @@
 
 #### UPDATE 1
 
-- **תיאור**: _(להשלים)_
+- **תיאור**: עדכון סטטוס עומס בית חולים: אם לבית חולים היו יותר מ־2 פינויים בשנה הנוכחית, הסטטוס שלו מתעדכן ל־`High` (מבוסס `TRANSFER_SUMMARIES`).
 - **שאילתה**:
 ```sql
--- TODO
+UPDATE HOSPITALS
+SET Current_Capacity_Status_ = 'High'
+WHERE Hospital_ID_ IN (
+    SELECT Hospital_ID_ 
+    FROM TRANSFER_SUMMARIES 
+    WHERE EXTRACT(YEAR FROM Arrival_At_Hospital_Time_) = EXTRACT(YEAR FROM CURRENT_DATE)
+    GROUP BY Hospital_ID_ 
+    HAVING COUNT(Transfer_ID_) > 2
+);
 ```
 - **צילום מצב לפני**: _(להדביק תמונה כאן)_
 - **צילום הרצה**: _(להדביק תמונה כאן)_
@@ -309,10 +409,14 @@
 
 #### UPDATE 2
 
-- **תיאור**: _(להשלים)_
+- **תיאור**: סגירת אירועים ישנים: אירועים בסטטוס `Pending` עם זמן סיום קריאה לא ריק, ושנת תחילת קריאה לפני 2025 — מתעדכנים ל־`Resolved`.
 - **שאילתה**:
 ```sql
--- TODO
+UPDATE INCIDENTS
+SET Status_ = 'Resolved'
+WHERE Status_ = 'Pending' 
+  AND Call_End_Timestamp_ IS NOT NULL 
+  AND EXTRACT(YEAR FROM Call_Start_Timestamp_) < 2025;
 ```
 - **צילום מצב לפני**: _(להדביק תמונה כאן)_
 - **צילום הרצה**: _(להדביק תמונה כאן)_
@@ -320,10 +424,17 @@
 
 #### UPDATE 3
 
-- **תיאור**: _(להשלים)_
+- **תיאור**: העלאת דרגת עדיפות לסוגי אירוע חמורים: סוג אירוע שעבורו ממוצע חומרה של האירועים גבוה מ־4 — עדיפות ברירת המחדל מתעדכנת ל־1 (הגבוהה ביותר).
 - **שאילתה**:
 ```sql
--- TODO
+UPDATE INCIDENT_TYPES
+SET Default_Priority_ = 1
+WHERE Type_ID_ IN (
+    SELECT Type_ID_ 
+    FROM INCIDENTS 
+    GROUP BY Type_ID_ 
+    HAVING AVG(Severity_Level_) > 4
+);
 ```
 - **צילום מצב לפני**: _(להדביק תמונה כאן)_
 - **צילום הרצה**: _(להדביק תמונה כאן)_
@@ -351,10 +462,11 @@
 
 #### אילוץ 1
 
-- **תיאור**: _(להשלים)_
+- **תיאור**: הגבלת רמת חומרה בטבלת `INCIDENTS` לטווח 1–5 (שומר על עקביות הערכים במערכת).
 - **פקודת `ALTER TABLE`**:
 ```sql
--- TODO
+ALTER TABLE INCIDENTS
+ADD CONSTRAINT CHK_Severity_Level CHECK (Severity_Level_ BETWEEN 1 AND 5);
 ```
 - **ניסיון הכנסת נתון סותר**:
 ```sql
@@ -364,10 +476,11 @@
 
 #### אילוץ 2
 
-- **תיאור**: _(להשלים)_
+- **תיאור**: וידוא שמספר בית (`House_Num_`) בטבלת `LOCATIONS` חיובי (> 0), למניעת כתובות לא תקינות.
 - **פקודת `ALTER TABLE`**:
 ```sql
--- TODO
+ALTER TABLE LOCATIONS
+ADD CONSTRAINT CHK_House_Num CHECK (House_Num_ > 0);
 ```
 - **ניסיון הכנסת נתון סותר**:
 ```sql
@@ -377,10 +490,11 @@
 
 #### אילוץ 3
 
-- **תיאור**: _(להשלים)_
+- **תיאור**: הגבלת ערכי `Success_Rate_` בטבלת `PROCEDURES_PERFORMED` לערכים מוגדרים בלבד (Enum לוגי).
 - **פקודת `ALTER TABLE`**:
 ```sql
--- TODO
+ALTER TABLE PROCEDURES_PERFORMED
+ADD CONSTRAINT CHK_Success_Rate_Enum CHECK (Success_Rate_ IN ('High', 'Medium', 'Low', 'Failed'));
 ```
 - **ניסיון הכנסת נתון סותר**:
 ```sql
