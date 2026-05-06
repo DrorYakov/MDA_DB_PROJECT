@@ -149,7 +149,7 @@ GROUP BY L.City_
 HAVING COUNT(I.Incident_ID_) > 5
 ORDER BY Total_Severe_Incidents DESC;
 ```
-![Image](Stage_2/query_1/query1First.png)
+![Image](stage_2/query_1/query1First.png)
 
 - **שאילתה – צורה ב׳**:
 ```sql
@@ -160,7 +160,7 @@ GROUP BY City_
 HAVING COUNT(Location_ID_) > 5
 ORDER BY Total_Severe_Incidents DESC;
 ```
-![Image](Stage_2/query_1/query1Second.png)
+![Image](stage_2/query_1/query1Second.png)
 
 - **הבדלים ויעילות**:
   - **מה ההבדל בין צורה א׳ לצורה ב׳**: צורה א׳ משתמשת ב-`JOIN` ומחזירה גם ממוצע חומרה; צורה ב׳ משתמשת בתת-שאילתה עם `IN` ומבצעת ספירה על טבלת `LOCATIONS`.
@@ -178,7 +178,7 @@ WHERE M.Pulse_ > 120
   AND EXTRACT(YEAR FROM M.Recorded_At_) = EXTRACT(YEAR FROM CURRENT_DATE)
 GROUP BY P.First_Name_, P.Last_Name_, P.Insurance_Provider_;
 ```
-![Image](Stage_2/query_2/query2First.png)
+![Image](stage_2/query_2/query2First.png)
 
 - **שאילתה – צורה ב׳**:
 ```sql
@@ -193,7 +193,7 @@ WHERE EXISTS (
 )
 GROUP BY P.First_Name_, P.Last_Name_, P.Insurance_Provider_;
 ```
-![Image](Stage_2/query_2/query2Second.png)
+![Image](stage_2/query_2/query2Second.png)
 
 - **הבדלים ויעילות**:
   - **הבדל**: צורה א׳ עושה `JOIN` ישיר על טבלת המדדים ועלולה להחזיר/לעבד ריבוי שורות לכל מטופל; צורה ב׳ משתמשת ב-`EXISTS` ובודקת רק קיום מדד מתאים (אפשר “לעצור מוקדם”).
@@ -211,7 +211,7 @@ LEFT JOIN TRANSFER_SUMMARIES TS
   AND EXTRACT(YEAR FROM TS.Arrival_At_Hospital_Time_) = EXTRACT(YEAR FROM CURRENT_DATE)
 WHERE TS.Transfer_ID_ IS NULL;
 ```
-![Image](Stage_2/query_3/query3First.png)
+![Image](stage_2/query_3/query3First.png)
 
 - **שאילתה – צורה ב׳**:
 ```sql
@@ -223,7 +223,7 @@ WHERE Hospital_ID_ NOT IN (
     WHERE EXTRACT(YEAR FROM Arrival_At_Hospital_Time_) = EXTRACT(YEAR FROM CURRENT_DATE)
 );
 ```
-![Image](Stage_2/query_3/query3Second.png)
+![Image](stage_2/query_3/query3Second.png)
 
 - **הבדלים ויעילות**:
   - **הבדל**: צורה א׳ משתמשת ב־`LEFT JOIN ... IS NULL` (אנטי-ג'וין). צורה ב׳ משתמשת ב־`NOT IN` עם תת-שאילתה.
@@ -243,7 +243,7 @@ JOIN INCIDENTS I ON C.Caller_ID_ = I.Caller_ID_
 GROUP BY C.Full_Name_, C.Phone_Number_, Call_Year, Call_Month
 HAVING COUNT(I.Incident_ID_) > 2;
 ```
-![Image](Stage_2/query_4/query4First.png)
+![Image](stage_2/query_4/query4First.png)
 
 - **שאילתה – צורה ב׳**:
 ```sql
@@ -259,7 +259,7 @@ FROM (
 ) AS MonthlyStats
 WHERE Total_Calls > 2;
 ```
-![Image](Stage_2/query_4/query4Second.png)
+![Image](stage_2/query_4/query4Second.png)
 
 - **הבדלים ויעילות**:
   - **הבדל**: צורה א׳ מסננת עם `HAVING` על האגרגציה. צורה ב׳ בונה טבלה נגזרת (Derived Table) ואז מסננת ב־`WHERE`.
@@ -284,7 +284,7 @@ GROUP BY P.First_Name_, P.Last_Name_, P.Birth_Date_
 HAVING MIN(M.Oxygen_Saturation_) < 90
 ORDER BY Lowest_Oxygen ASC;
 ```
-![Image](Stage_2/query_5/query5.png)
+![Image](stage_2/query_5/query5.png)
 
 
 ##### SELECT 6 — תיאור בעברית
@@ -305,7 +305,7 @@ GROUP BY L.City_, L.Street_
 HAVING COUNT(I.Incident_ID_) >= 2
 ORDER BY Highest_Severity DESC, Active_Incidents DESC;
 ```
-![Image](Stage_2/query_6/query6.png)
+![Image](stage_2/query_6/query6.png)
 
 
 ##### SELECT 7 — תיאור בעברית
@@ -326,7 +326,7 @@ GROUP BY H.Hospital_Name_, H.City_, TS.Receiving_Physician_
 HAVING COUNT(TS.Transfer_ID_) > 5
 ORDER BY Total_Patients_Received DESC;
 ```
-![Image](Stage_2/query_7/query7.png)
+![Image](stage_2/query_7/query7.png)
 
 
 ##### SELECT 8 — תיאור בעברית
@@ -341,7 +341,7 @@ JOIN PATIENTS P ON PP.Patient_ID_ = P.Patient_ID_
 WHERE PP.Success_Rate_ = 'High'
 ORDER BY Patient_Age_At_Procedure ASC;
 ```
-![Image](Stage_2/query_8/query8.png)
+![Image](stage_2/query_8/query8.png)
 
 
 ### שאילתות DELETE (3 סה״כ)
