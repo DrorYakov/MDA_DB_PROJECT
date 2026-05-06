@@ -481,7 +481,7 @@ ADD CONSTRAINT CHK_House_Num CHECK (House_Num_ > 0);
 ```sql
 ALTER TABLE PROCEDURES_PERFORMED
 ADD CONSTRAINT CHK_Success_Rate_Enum CHECK (Success_Rate_ IN ('High', 'Medium', 'Low', 'Failed'));
-
+```
 ![Image](images/stage_2/alertError2.png)
 
 
@@ -490,30 +490,17 @@ ADD CONSTRAINT CHK_Success_Rate_Enum CHECK (Success_Rate_ IN ('High', 'Medium', 
 לכל אינדקס: לבדוק זמן ריצה לפני ואחרי הוספת האינדקס, ולהסביר תוצאות.
 
 #### אינדקס 1
-
-- **מוטיבציה/תועלת**: _(להשלים)_
-- **בדיקת זמן ריצה לפני**: _(להדביק תמונה כאן)_
-- **פקודת יצירת אינדקס**:
-
 ![Image](images/stage_2/index1Before.png)
 ![Image](images/stage_2/Index1.png)
 ![Image](images/stage_2/index1After.png)
 
 
 #### אינדקס 2
-
-- **מוטיבציה/תועלת**: _(להשלים)_
-- **בדיקת זמן ריצה לפני**: _(להדביק תמונה כאן)_
-- **פקודת יצירת אינדקס**:
 ![Image](images/stage_2/index2Before.png)
 ![Image](images/stage_2/Index2.png)
 ![Image](images/stage_2/index2After.png)
 
 #### אינדקס 3
-
-- **מוטיבציה/תועלת**: _(להשלים)_
-- **בדיקת זמן ריצה לפני**: _(להדביק תמונה כאן)_
-- **פקודת יצירת אינדקס**:
 ![Image](images/stage_2/index3Before.png)
 ![Image](images/stage_2/Index3.png)
 ![Image](images/stage_2/index3After.png)
