@@ -357,8 +357,8 @@ DELETE FROM MEDICAL_MEASUREMENTS
 WHERE EXTRACT(YEAR FROM Recorded_At_) < 2014;
 ```
 
-![Image](images/stage_2/Delete2.png)
-![Image](images/stage_2/Delete2After.png)
+![Image](images/stage_2/delete2.png)
+![Image](images/stage_2/delete2After.png)
 
 #### DELETE 2
 
@@ -380,8 +380,8 @@ DELETE FROM LOCATIONS
 WHERE Incident_ID_ IN (SELECT Incident_ID_ FROM INCIDENTS WHERE Status_ = 'Cancelled');
 ```
 
-![Image](images/stage_2/Delete3.png)
-![Image](images/stage_2/Delete3After.png)
+![Image](images/stage_2/delete3.png)
+![Image](images/stage_2/delete3After.png)
 
 ### שאילתות UPDATE (3 סה״כ)
 
