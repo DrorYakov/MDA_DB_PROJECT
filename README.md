@@ -402,9 +402,8 @@ WHERE Hospital_ID_ IN (
     HAVING COUNT(Transfer_ID_) > 2
 );
 ```
-- **צילום מצב לפני**: _(להדביק תמונה כאן)_
-- **צילום הרצה**: _(להדביק תמונה כאן)_
-- **צילום מצב אחרי**: _(להדביק תמונה כאן)_
+![Image](images/stage_2/Update1.png)
+
 
 #### UPDATE 2
 
@@ -417,9 +416,7 @@ WHERE Status_ = 'Pending'
   AND Call_End_Timestamp_ IS NOT NULL 
   AND EXTRACT(YEAR FROM Call_Start_Timestamp_) < 2025;
 ```
-- **צילום מצב לפני**: _(להדביק תמונה כאן)_
-- **צילום הרצה**: _(להדביק תמונה כאן)_
-- **צילום מצב אחרי**: _(להדביק תמונה כאן)_
+![Image](images/stage_2/Update2.png)
 
 #### UPDATE 3
 
@@ -435,9 +432,8 @@ WHERE Type_ID_ IN (
     HAVING AVG(Severity_Level_) > 4
 );
 ```
-- **צילום מצב לפני**: _(להדביק תמונה כאן)_
-- **צילום הרצה**: _(להדביק תמונה כאן)_
-- **צילום מצב אחרי**: _(להדביק תמונה כאן)_
+![Image](images/stage_2/Update3.png)
+
 
 ### ROLLBACK ו-COMMIT (הדגמות)
 
@@ -451,9 +447,9 @@ WHERE Type_ID_ IN (
 #### הדגמה 2 — עדכון ואז `COMMIT`
 
 - **תיאור**: מבצעים עדכון בבסיס הנתונים, מציגים מצב, מבצעים `COMMIT`, ומציגים שהמצב נשאר כפי שהיה.
-- **צילום מצב התחלתי (לפני העדכון)**: _(להדביק תמונה כאן)_
-- **צילום אחרי העדכון**: _(להדביק תמונה כאן)_
-- **צילום אחרי `COMMIT`**: _(להדביק תמונה כאן)_
+![Image](images/stage_2/beforeCommit.png)
+![Image](images/stage_2/afterCommit.png)
+
 
 ### אילוצים (3 סה״כ) באמצעות `ALTER TABLE`
 
@@ -467,11 +463,6 @@ WHERE Type_ID_ IN (
 ALTER TABLE INCIDENTS
 ADD CONSTRAINT CHK_Severity_Level CHECK (Severity_Level_ BETWEEN 1 AND 5);
 ```
-- **ניסיון הכנסת נתון סותר**:
-```sql
--- TODO
-```
-- **צילום שגיאת הרצה**: _(להדביק תמונה כאן)_
 
 #### אילוץ 2
 
@@ -481,11 +472,7 @@ ADD CONSTRAINT CHK_Severity_Level CHECK (Severity_Level_ BETWEEN 1 AND 5);
 ALTER TABLE LOCATIONS
 ADD CONSTRAINT CHK_House_Num CHECK (House_Num_ > 0);
 ```
-- **ניסיון הכנסת נתון סותר**:
-```sql
--- TODO
-```
-- **צילום שגיאת הרצה**: _(להדביק תמונה כאן)_
+
 
 #### אילוץ 3
 
@@ -494,12 +481,9 @@ ADD CONSTRAINT CHK_House_Num CHECK (House_Num_ > 0);
 ```sql
 ALTER TABLE PROCEDURES_PERFORMED
 ADD CONSTRAINT CHK_Success_Rate_Enum CHECK (Success_Rate_ IN ('High', 'Medium', 'Low', 'Failed'));
-```
-- **ניסיון הכנסת נתון סותר**:
-```sql
--- TODO
-```
-- **צילום שגיאת הרצה**: _(להדביק תמונה כאן)_
+
+![Image](images/stage_2/alertError2.png)
+
 
 ### אינדקסים (3 סה״כ) + בדיקות זמן ריצה
 
@@ -510,34 +494,26 @@ ADD CONSTRAINT CHK_Success_Rate_Enum CHECK (Success_Rate_ IN ('High', 'Medium', 
 - **מוטיבציה/תועלת**: _(להשלים)_
 - **בדיקת זמן ריצה לפני**: _(להדביק תמונה כאן)_
 - **פקודת יצירת אינדקס**:
-```sql
--- TODO
-```
-- **בדיקת זמן ריצה אחרי**: _(להדביק תמונה כאן)_
-- **הסבר תוצאות**: _(להשלים)_
+
+![Image](images/stage_2/index1Before.png)
+![Image](images/stage_2/Index1.png)
+![Image](images/stage_2/index1After.png)
+
 
 #### אינדקס 2
 
 - **מוטיבציה/תועלת**: _(להשלים)_
 - **בדיקת זמן ריצה לפני**: _(להדביק תמונה כאן)_
 - **פקודת יצירת אינדקס**:
-```sql
--- TODO
-```
-- **בדיקת זמן ריצה אחרי**: _(להדביק תמונה כאן)_
-- **הסבר תוצאות**: _(להשלים)_
+![Image](images/stage_2/index2Before.png)
+![Image](images/stage_2/Index2.png)
+![Image](images/stage_2/index2After.png)
 
 #### אינדקס 3
 
 - **מוטיבציה/תועלת**: _(להשלים)_
 - **בדיקת זמן ריצה לפני**: _(להדביק תמונה כאן)_
 - **פקודת יצירת אינדקס**:
-```sql
--- TODO
-```
-- **בדיקת זמן ריצה אחרי**: _(להדביק תמונה כאן)_
-- **הסבר תוצאות**: _(להשלים)_
-
-### TAG להגשה
-
-בסיום שלב ב׳ חובה לייצר **תג (TAG) בגיט** עבור ההגשה.
+![Image](images/stage_2/index3Before.png)
+![Image](images/stage_2/Index3.png)
+![Image](images/stage_2/index3After.png)
