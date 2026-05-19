@@ -1,3 +1,5 @@
+Begin;
+
 --Before update
 SELECT Hospital_Name_, City_, Current_Capacity_Status_ FROM HOSPITALS WHERE City_ = 'Tel Aviv';
 
