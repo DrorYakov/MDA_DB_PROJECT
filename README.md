@@ -847,13 +847,15 @@ EXCEPTION
         RETURN 0;
 END;
 $$ LANGUAGE plpgsql;
-הוכחת הרצה: (הכנס כאן 2 תמונות: אחת של קריאה לפונקציה עם מטופל תקין שמחזירה מספר, ואחת של קריאה עם מטופל שאין לו מדדים שמציגה את ה-Exception)
 
+```
+הוכחת הרצה: (הכנס כאן 2 תמונות: אחת של קריאה לפונקציה עם מטופל תקין שמחזירה מספר, ואחת של קריאה עם מטופל שאין לו מדדים שמציגה את ה-Exception)
+---
 1.2 פונקציית שליפת אירועים קריטיים (get_active_critical_incidents)
 תיאור מילולי: פונקציה המיועדת למערכת הניהול. היא מקבלת רמת חומרה מינימלית, ומחזירה מצביע (REF CURSOR) לתוצאות שאילתה המשלבת את טבלת האירועים וטבלת המיקומים עבור אירועים פעילים.
-
+---
 קוד הפונקציה:
-
+```sql
 SQL
 CREATE OR REPLACE FUNCTION get_active_critical_incidents(p_min_severity INT)
 RETURNS REFCURSOR AS $$
@@ -873,15 +875,18 @@ BEGIN
     RETURN v_ref_cursor;
 END;
 $$ LANGUAGE plpgsql;
+```
 הוכחת הרצה: (הכנס כאן תמונה מתוך בלוק טרנזקציה ב-pgAdmin שבה קראת לפונקציה ועשית FETCH ALL IN והתוצאות הוצגו)
+---
 
 2. פרוצדורות (Procedures)
 2.1 עדכון תפוסת בתי חולים (update_hospital_capacities)
 תיאור מילולי: הפרוצדורה משתמשת בסמן מפורש (Explicit Cursor) כדי לעבור על כל בתי החולים. עבור כל בית חולים, היא סופרת את כמות המטופלים שהועברו אליו השנה, ומשתמשת בפקודות UPDATE והסתעפויות כדי לעדכן את עמודת סטטוס התפוסה שלו ל-'Full', 'High' או 'Normal'.
+---
 
 קוד הפרוצדורה:
 
-SQL
+```sql
 CREATE OR REPLACE PROCEDURE update_hospital_capacities()
 LANGUAGE plpgsql AS $$
 DECLARE
@@ -934,14 +939,17 @@ EXCEPTION
         RAISE NOTICE 'An error occurred while updating hospital capacities: %', SQLERRM;
 END;
 $$;
+```
 הוכחת הרצה: (הכנס כאן תמונה של טבלת HOSPITALS לפני ההרצה, ותמונה אחרי ההרצה שבה רואים את הסטטוסים שהשתנו)
+---
 
 2.2 ניקוי אירועי שווא (cancel_stale_incidents)
 תיאור מילולי: הפרוצדורה עוברת על כל האירועים המוגדרים כ-'Pending' אך שיחתם הסתיימה. היא מבצעת מספר פקודות DML ברצף: מעדכנת את סטטוס האירוע ל-'Cancelled', ולאחר מכן מוחקת (DELETE) את רשומת המיקום שלו מטבלת המיקומים כדי לנקות נתונים מיותרים מהמפה.
+---
 
 קוד הפרוצדורה:
 
-SQL
+```sql
 CREATE OR REPLACE PROCEDURE cancel_stale_incidents()
 LANGUAGE plpgsql AS $$
 DECLARE
@@ -980,15 +988,18 @@ EXCEPTION
         RAISE NOTICE 'Error encountered during stale incident cancellation: %', SQLERRM;
 END;
 $$;
+```
 הוכחת הרצה: (הכנס כאן תמונה מתוך לשונית Messages המראה את ההדפסה של סיכום המחיקות)
+---
 
 3. טריגרים (Triggers)
 3.1 חסימת סגירת אירוע ללא פינוי (trg_verify_critical_closure)
 תיאור מילולי: טריגר הפועל BEFORE UPDATE על טבלת INCIDENTS. במקרה של ניסיון לשנות סטטוס של אירוע בעל חומרה 5 ל-'Resolved', הטריגר בודק האם קיים לו טופס העברה לבית חולים. אם לא – העדכון נחסם ונזרקת שגיאה קריטית.
+---
 
 קוד הטריגר:
 
-SQL
+```sql
 CREATE OR REPLACE FUNCTION verify_critical_incident_closure()
 RETURNS TRIGGER AS $$
 DECLARE
@@ -1020,14 +1031,17 @@ CREATE TRIGGER trg_verify_critical_closure
 BEFORE UPDATE ON INCIDENTS
 FOR EACH ROW
 EXECUTE FUNCTION verify_critical_incident_closure();
+```
 הוכחת הרצה: (הכנס צילום מסך של ניסיון לבצע פקודת UPDATE כזו, וצילום של הודעת השגיאה שהטריגר זרק)
+---
 
 3.2 הקפצת חומרה אוטומטית (trg_escalate_severity)
 תיאור מילולי: טריגר מבצעי הפועל AFTER INSERT OR UPDATE על טבלת המדדים (MEDICAL_MEASUREMENTS). אם מוזן מדד חריג ממוניטור הצוות בשטח (למשל, סטורציה מתחת ל-85 או דופק מעל 150), הטריגר מזהה את האירוע הרלוונטי ומבצע עליו פקודת UPDATE המעלה אוטומטית את דרגת החומרה שלו ל-5.
+---
 
 קוד הטריגר:
 
-SQL
+```sql
 CREATE OR REPLACE FUNCTION escalate_incident_severity()
 RETURNS TRIGGER AS $$
 DECLARE
@@ -1058,15 +1072,19 @@ CREATE TRIGGER trg_escalate_severity
 AFTER INSERT OR UPDATE ON MEDICAL_MEASUREMENTS
 FOR EACH ROW
 EXECUTE FUNCTION escalate_incident_severity();
+```
+
 הוכחת הרצה: (הכנס צילום של טבלת INCIDENTS לפני עם חומרה נמוכה, צילום פקודת ה-INSERT של המדד, וצילום INCIDENTS אחרי בו רואים שהחומרה קפצה ל-5)
+---
 
 4. תוכניות ראשיות (Anonymous Blocks)
 4.1 תוכנית ראשית א': ניהול סיכונים ותפוסה
 תיאור מילולי: בלוק אנונימי המזמן קודם כל את הפרוצדורה update_hospital_capacities, ולאחר מכן קורא לפונקציה calculate_patient_risk_score עבור מטופל ספציפי ומדפיס את ציון הסיכון שהוחזר לקונסולה.
+---
 
 קוד התוכנית:
 
-SQL
+```sql
 DO $$
 DECLARE
     v_test_patient_id INT := 1; 
@@ -1090,14 +1108,17 @@ EXCEPTION
         RAISE NOTICE 'An error occurred in Main Program 1: %', SQLERRM;
 END;
 $$;
+```
 הוכחת הרצה: (הכנס צילום מסך של חלונית ה-Messages ב-pgAdmin לאחר הרצת הבלוק)
+---
 
 4.2 תוכנית ראשית ב': מערך שליטה ובקרה לאירועים קריטיים
 תיאור מילולי: התוכנית מפעילה בתחילה את פרוצדורת הניקוי cancel_stale_incidents. מיד לאחר מכן, היא מזמנת את הפונקציה get_active_critical_incidents ומקבלת ממנה REF CURSOR. באמצעות לולאת LOOP, התוכנית שואבת רשומה אחר רשומה מהסמן ומדפיסה את פרטי האירועים הקריטיים למסך הפלט.
+---
 
 קוד התוכנית:
 
-SQL
+```sql
 DO $$
 DECLARE
     v_cursor REFCURSOR;
@@ -1136,4 +1157,5 @@ EXCEPTION
         RAISE NOTICE 'An error occurred in Main Program 2: %', SQLERRM;
 END;
 $$;
+```
 הוכחת הרצה: (הכנס צילום מסך של חלונית ה-Messages המראה את הלולאה מדפיסה את האירועים אחד אחד)
