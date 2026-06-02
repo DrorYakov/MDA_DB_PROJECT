@@ -22,6 +22,7 @@
 10. [אילוצים באמצעות ALTER TABLE](#אילוצים-3-סהכ-באמצעות-alter-table)
 11. [אינדקסים (Indexes)](#אינדקסים-3-סהכ--בדיקות-זמן-ריצה)
 12. [שלב ג': אינטגרציה ומבטים מתקדמים](#שלב-ג--אינטגרציית-בסיסי-נתונים-ומבטים-מתקדמים)
+13. [שלב ד'](#שלב-ד-תכנות-במסד-הנתונים-plpgsql)
 ---
 
 ## מבוא
@@ -786,7 +787,9 @@ ADD CONSTRAINT CHK_Success_Rate_Enum CHECK (Success_Rate_ IN ('High', 'Medium', 
 
 ## שלב ד': תכנות במסד הנתונים (PL/pgSQL)
 
-בשלב זה הוספנו לוגיקה עסקית דינמית בצד השרת באמצעות כתיבת פונקציות, פרוצדורות, טריגרים ותוכניות ראשיות ב-PL/pgSQL. 
+בשלב זה הוספנו לוגיקה עסקית דינמית ומורכבת בצד השרת באמצעות כתיבת פונקציות, פרוצדורות, טריגרים ותוכניות ראשיות ב-PL/pgSQL. 
+הקוד מיישם עקרונות תכנות מתקדמים במסד הנתונים ומכסה את הדרישות הבאות: שימוש בסמנים (Implicit & Explicit), החזרת `REF CURSOR`, פקודות DML שונות, הסתעפויות (`IF/ELSIF`), לולאות (`LOOP`, `FOR`), טיפול בשגיאות (`EXCEPTION`), ושימוש במשתנים מטיפוס `RECORD`.
+
 כל התוכניות נבדקו ורצו בהצלחה. להלן הפירוט, הקוד והוכחות ההרצה לכל תוכנית.
 
 ---
@@ -794,7 +797,7 @@ ADD CONSTRAINT CHK_Success_Rate_Enum CHECK (Success_Rate_ IN ('High', 'Medium', 
 ### 1. פונקציות (Functions)
 
 #### 1.1 פונקציה לחישוב ציון סיכון (`calculate_patient_risk_score`)
-* **תיאור מילולי:** הפונקציה מקבלת מזהה מטופל (`Patient_ID_`), שולפת באמצעות סמן מרומז את כל המדדים הרפואיים שלו, ומחשבת "ציון סיכון" המבוסס על חריגות בסטורציה, דופק ולחץ דם. משתמשת בלולאות, הסתעפויות ומשתנה מטיפוס `RECORD`. אם לא נמצאו מדדים למטופל, נזרקת חריגה (Exception) יזומה.
+* **תיאור מילולי:** הפונקציה מקבלת מזהה מטופל (`Patient_ID_`), שולפת באמצעות סמן מרומז את כל המדדים הרפואיים שלו, ומחשבת "ציון סיכון" המבוסס על חריגות בסטורציה, דופק ולחץ דם. הפונקציה משתמשת בלולאות, הסתעפויות ומשתנה מטיפוס `RECORD`. אם לא נמצאו מדדים למטופל, נזרקת חריגה (Exception) יזומה.
 * **קוד הפונקציה:**
 ```sql
 CREATE OR REPLACE FUNCTION calculate_patient_risk_score(p_patient_id INT)
@@ -844,3 +847,293 @@ EXCEPTION
         RETURN 0;
 END;
 $$ LANGUAGE plpgsql;
+הוכחת הרצה: (הכנס כאן 2 תמונות: אחת של קריאה לפונקציה עם מטופל תקין שמחזירה מספר, ואחת של קריאה עם מטופל שאין לו מדדים שמציגה את ה-Exception)
+
+1.2 פונקציית שליפת אירועים קריטיים (get_active_critical_incidents)
+תיאור מילולי: פונקציה המיועדת למערכת הניהול. היא מקבלת רמת חומרה מינימלית, ומחזירה מצביע (REF CURSOR) לתוצאות שאילתה המשלבת את טבלת האירועים וטבלת המיקומים עבור אירועים פעילים.
+
+קוד הפונקציה:
+
+SQL
+CREATE OR REPLACE FUNCTION get_active_critical_incidents(p_min_severity INT)
+RETURNS REFCURSOR AS $$
+DECLARE
+    v_ref_cursor REFCURSOR; -- Variable declaration for the reference cursor
+BEGIN
+    -- Open the ref cursor dynamically based on the severity parameter
+    OPEN v_ref_cursor FOR
+        SELECT I.Incident_ID_, I.Call_Start_Timestamp_, I.Severity_Level_, L.City_, L.Street_
+        FROM INCIDENTS I
+        JOIN LOCATIONS L ON I.Incident_ID_ = L.Incident_ID_
+        WHERE I.Status_ IN ('Pending', 'Dispatched', 'On Scene')
+          AND I.Severity_Level_ >= p_min_severity
+        ORDER BY I.Severity_Level_ DESC, I.Call_Start_Timestamp_ ASC;
+
+    -- Return the cursor pointing to the result set
+    RETURN v_ref_cursor;
+END;
+$$ LANGUAGE plpgsql;
+הוכחת הרצה: (הכנס כאן תמונה מתוך בלוק טרנזקציה ב-pgAdmin שבה קראת לפונקציה ועשית FETCH ALL IN והתוצאות הוצגו)
+
+2. פרוצדורות (Procedures)
+2.1 עדכון תפוסת בתי חולים (update_hospital_capacities)
+תיאור מילולי: הפרוצדורה משתמשת בסמן מפורש (Explicit Cursor) כדי לעבור על כל בתי החולים. עבור כל בית חולים, היא סופרת את כמות המטופלים שהועברו אליו השנה, ומשתמשת בפקודות UPDATE והסתעפויות כדי לעדכן את עמודת סטטוס התפוסה שלו ל-'Full', 'High' או 'Normal'.
+
+קוד הפרוצדורה:
+
+SQL
+CREATE OR REPLACE PROCEDURE update_hospital_capacities()
+LANGUAGE plpgsql AS $$
+DECLARE
+    v_hospital_record RECORD; -- Using RECORD type for the explicit cursor
+    v_transfer_count INT;
+    
+    -- Explicit cursor declaration to fetch all hospitals
+    cursor_hospitals CURSOR FOR 
+        SELECT Hospital_ID_, Current_Capacity_Status_ 
+        FROM HOSPITALS;
+BEGIN
+    -- Open the cursor and begin looping through the rows
+    OPEN cursor_hospitals;
+    LOOP
+        FETCH cursor_hospitals INTO v_hospital_record;
+        
+        -- Exit the loop when there are no more rows
+        EXIT WHEN NOT FOUND;
+
+        -- Count transfers to this specific hospital in the current year
+        SELECT COUNT(Transfer_ID_) INTO v_transfer_count
+        FROM TRANSFER_SUMMARIES
+        WHERE Hospital_ID_ = v_hospital_record.Hospital_ID_
+          AND EXTRACT(YEAR FROM Arrival_At_Hospital_Time_) = EXTRACT(YEAR FROM CURRENT_DATE);
+
+        -- Branching logic to determine and update the new capacity status
+        IF v_transfer_count > 10 THEN
+            UPDATE HOSPITALS
+            SET Current_Capacity_Status_ = 'Full'
+            WHERE Hospital_ID_ = v_hospital_record.Hospital_ID_;
+            
+        ELSIF v_transfer_count BETWEEN 5 AND 10 THEN
+            UPDATE HOSPITALS
+            SET Current_Capacity_Status_ = 'High'
+            WHERE Hospital_ID_ = v_hospital_record.Hospital_ID_;
+            
+        ELSE
+            UPDATE HOSPITALS
+            SET Current_Capacity_Status_ = 'Normal'
+            WHERE Hospital_ID_ = v_hospital_record.Hospital_ID_;
+        END IF;
+    END LOOP;
+    
+    -- Close the cursor to free memory
+    CLOSE cursor_hospitals;
+
+EXCEPTION
+    WHEN OTHERS THEN
+        -- Handle execution errors safely without crashing the system
+        RAISE NOTICE 'An error occurred while updating hospital capacities: %', SQLERRM;
+END;
+$$;
+הוכחת הרצה: (הכנס כאן תמונה של טבלת HOSPITALS לפני ההרצה, ותמונה אחרי ההרצה שבה רואים את הסטטוסים שהשתנו)
+
+2.2 ניקוי אירועי שווא (cancel_stale_incidents)
+תיאור מילולי: הפרוצדורה עוברת על כל האירועים המוגדרים כ-'Pending' אך שיחתם הסתיימה. היא מבצעת מספר פקודות DML ברצף: מעדכנת את סטטוס האירוע ל-'Cancelled', ולאחר מכן מוחקת (DELETE) את רשומת המיקום שלו מטבלת המיקומים כדי לנקות נתונים מיותרים מהמפה.
+
+קוד הפרוצדורה:
+
+SQL
+CREATE OR REPLACE PROCEDURE cancel_stale_incidents()
+LANGUAGE plpgsql AS $$
+DECLARE
+    v_incident_record RECORD; -- Implicit cursor record
+    v_deleted_locations INT := 0;
+    v_updated_incidents INT := 0;
+BEGIN
+    -- Implicit cursor using a FOR loop to find stale pending incidents
+    FOR v_incident_record IN (
+        SELECT Incident_ID_ 
+        FROM INCIDENTS 
+        WHERE Status_ = 'Pending' 
+          AND Call_End_Timestamp_ IS NOT NULL
+    ) LOOP
+        -- DML Command 1: Cancel the incident status
+        UPDATE INCIDENTS
+        SET Status_ = 'Cancelled'
+        WHERE Incident_ID_ = v_incident_record.Incident_ID_;
+        
+        v_updated_incidents := v_updated_incidents + 1;
+
+        -- DML Command 2: Delete the corresponding physical location
+        DELETE FROM LOCATIONS
+        WHERE Incident_ID_ = v_incident_record.Incident_ID_;
+        
+        v_deleted_locations := v_deleted_locations + 1;
+    END LOOP;
+
+    -- Output a success message showing the summary of the operations
+    RAISE NOTICE 'Cleanup finished: % incidents cancelled, % locations deleted.', 
+                 v_updated_incidents, v_deleted_locations;
+
+EXCEPTION
+    WHEN OTHERS THEN
+        -- Safely handle exceptions during the cleanup process
+        RAISE NOTICE 'Error encountered during stale incident cancellation: %', SQLERRM;
+END;
+$$;
+הוכחת הרצה: (הכנס כאן תמונה מתוך לשונית Messages המראה את ההדפסה של סיכום המחיקות)
+
+3. טריגרים (Triggers)
+3.1 חסימת סגירת אירוע ללא פינוי (trg_verify_critical_closure)
+תיאור מילולי: טריגר הפועל BEFORE UPDATE על טבלת INCIDENTS. במקרה של ניסיון לשנות סטטוס של אירוע בעל חומרה 5 ל-'Resolved', הטריגר בודק האם קיים לו טופס העברה לבית חולים. אם לא – העדכון נחסם ונזרקת שגיאה קריטית.
+
+קוד הטריגר:
+
+SQL
+CREATE OR REPLACE FUNCTION verify_critical_incident_closure()
+RETURNS TRIGGER AS $$
+DECLARE
+    v_transfer_exists BOOLEAN := FALSE;
+BEGIN
+    -- Check if the incident is being marked as Resolved and is critical (Severity 5)
+    IF NEW.Status_ = 'Resolved' AND NEW.Severity_Level_ = 5 THEN
+        
+        -- Check if there is at least one transfer summary for this incident
+        SELECT EXISTS (
+            SELECT 1
+            FROM TRANSFER_SUMMARIES TS
+            JOIN EMERGENCY_DISPATCHES ED ON TS.Dispatch_ID_ = ED.Dispatch_ID_
+            WHERE ED.Incident_ID_ = NEW.Incident_ID_
+        ) INTO v_transfer_exists;
+        
+        -- If no transfer summary exists, block the update
+        IF NOT v_transfer_exists THEN
+            RAISE EXCEPTION 'Cannot resolve critical incident % without a hospital transfer summary.', NEW.Incident_ID_;
+        END IF;
+    END IF;
+    
+    -- Allow the update to proceed if conditions are met
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER trg_verify_critical_closure
+BEFORE UPDATE ON INCIDENTS
+FOR EACH ROW
+EXECUTE FUNCTION verify_critical_incident_closure();
+הוכחת הרצה: (הכנס צילום מסך של ניסיון לבצע פקודת UPDATE כזו, וצילום של הודעת השגיאה שהטריגר זרק)
+
+3.2 הקפצת חומרה אוטומטית (trg_escalate_severity)
+תיאור מילולי: טריגר מבצעי הפועל AFTER INSERT OR UPDATE על טבלת המדדים (MEDICAL_MEASUREMENTS). אם מוזן מדד חריג ממוניטור הצוות בשטח (למשל, סטורציה מתחת ל-85 או דופק מעל 150), הטריגר מזהה את האירוע הרלוונטי ומבצע עליו פקודת UPDATE המעלה אוטומטית את דרגת החומרה שלו ל-5.
+
+קוד הטריגר:
+
+SQL
+CREATE OR REPLACE FUNCTION escalate_incident_severity()
+RETURNS TRIGGER AS $$
+DECLARE
+    v_incident_id INT;
+BEGIN
+    -- Check if the new measurement indicates a critical condition
+    IF NEW.Oxygen_Saturation_ < 85 OR NEW.Pulse_ > 150 THEN
+        
+        -- Find the corresponding incident ID via the dispatch table
+        SELECT Incident_ID_ INTO v_incident_id
+        FROM EMERGENCY_DISPATCHES
+        WHERE Dispatch_ID_ = NEW.Dispatch_ID_;
+        
+        -- If an incident is found, automatically elevate its severity to 5 (Critical)
+        IF v_incident_id IS NOT NULL THEN
+            UPDATE INCIDENTS
+            SET Severity_Level_ = 5
+            WHERE Incident_ID_ = v_incident_id AND Severity_Level_ < 5;
+        END IF;
+    END IF;
+    
+    -- Proceed with the insertion of the measurement
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER trg_escalate_severity
+AFTER INSERT OR UPDATE ON MEDICAL_MEASUREMENTS
+FOR EACH ROW
+EXECUTE FUNCTION escalate_incident_severity();
+הוכחת הרצה: (הכנס צילום של טבלת INCIDENTS לפני עם חומרה נמוכה, צילום פקודת ה-INSERT של המדד, וצילום INCIDENTS אחרי בו רואים שהחומרה קפצה ל-5)
+
+4. תוכניות ראשיות (Anonymous Blocks)
+4.1 תוכנית ראשית א': ניהול סיכונים ותפוסה
+תיאור מילולי: בלוק אנונימי המזמן קודם כל את הפרוצדורה update_hospital_capacities, ולאחר מכן קורא לפונקציה calculate_patient_risk_score עבור מטופל ספציפי ומדפיס את ציון הסיכון שהוחזר לקונסולה.
+
+קוד התוכנית:
+
+SQL
+DO $$
+DECLARE
+    v_test_patient_id INT := 1; 
+    v_calculated_risk INT;
+BEGIN
+    -- 1. Call the procedure to update hospital capacities
+    RAISE NOTICE 'Starting hospital capacity update...';
+    CALL update_hospital_capacities();
+    RAISE NOTICE 'Hospital capacities updated successfully.';
+
+    -- 2. Call the function to calculate risk score for a specific patient
+    RAISE NOTICE 'Calculating risk score for patient ID: %', v_test_patient_id;
+    v_calculated_risk := calculate_patient_risk_score(v_test_patient_id);
+    
+    -- Print the returned result
+    RAISE NOTICE 'The calculated risk score is: %', v_calculated_risk;
+
+EXCEPTION
+    WHEN OTHERS THEN
+        -- Safely handle any execution errors
+        RAISE NOTICE 'An error occurred in Main Program 1: %', SQLERRM;
+END;
+$$;
+הוכחת הרצה: (הכנס צילום מסך של חלונית ה-Messages ב-pgAdmin לאחר הרצת הבלוק)
+
+4.2 תוכנית ראשית ב': מערך שליטה ובקרה לאירועים קריטיים
+תיאור מילולי: התוכנית מפעילה בתחילה את פרוצדורת הניקוי cancel_stale_incidents. מיד לאחר מכן, היא מזמנת את הפונקציה get_active_critical_incidents ומקבלת ממנה REF CURSOR. באמצעות לולאת LOOP, התוכנית שואבת רשומה אחר רשומה מהסמן ומדפיסה את פרטי האירועים הקריטיים למסך הפלט.
+
+קוד התוכנית:
+
+SQL
+DO $$
+DECLARE
+    v_cursor REFCURSOR;
+    v_incident_id INT;
+    v_call_time TIMESTAMP;
+    v_severity INT;
+    v_city VARCHAR;
+    v_street VARCHAR;
+BEGIN
+    -- 1. Call the procedure to clean up stale incidents first
+    RAISE NOTICE 'Running cleanup for stale incidents...';
+    CALL cancel_stale_incidents();
+
+    -- 2. Call the function that returns a Ref Cursor (severity >= 4)
+    RAISE NOTICE 'Fetching active critical incidents...';
+    v_cursor := get_active_critical_incidents(4);
+    
+    -- Loop to process the returned cursor rows one by one
+    LOOP
+        FETCH NEXT FROM v_cursor INTO v_incident_id, v_call_time, v_severity, v_city, v_street;
+        
+        -- Exit loop when no more rows are fetched from the cursor
+        EXIT WHEN NOT FOUND;
+        
+        -- Display the fetched record
+        RAISE NOTICE 'Critical Incident ID: % | Severity: % | Location: % %', 
+                     v_incident_id, v_severity, v_street, v_city;
+    END LOOP;
+    
+    -- Close the cursor to free database memory
+    CLOSE v_cursor;
+
+EXCEPTION
+    WHEN OTHERS THEN
+        -- Safely handle any execution errors
+        RAISE NOTICE 'An error occurred in Main Program 2: %', SQLERRM;
+END;
+$$;
+הוכחת הרצה: (הכנס צילום מסך של חלונית ה-Messages המראה את הלולאה מדפיסה את האירועים אחד אחד)
