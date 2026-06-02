@@ -786,25 +786,61 @@ ADD CONSTRAINT CHK_Success_Rate_Enum CHECK (Success_Rate_ IN ('High', 'Medium', 
 
 ## שלב ד': תכנות במסד הנתונים (PL/pgSQL)
 
-בשלב זה הוספנו לוגיקה עסקית מורכבת ודינמית בצד השרת באמצעות כתיבת פונקציות, פרוצדורות וטריגרים ב-PL/pgSQL. הקוד מיישם עקרונות תכנות מתקדמים במסד הנתונים כגון שימוש בסמנים, טיפול בשגיאות, החזרת מצביעים ופעולות DML מורכבות.
+בשלב זה הוספנו לוגיקה עסקית דינמית בצד השרת באמצעות כתיבת פונקציות, פרוצדורות, טריגרים ותוכניות ראשיות ב-PL/pgSQL. 
+כל התוכניות נבדקו ורצו בהצלחה. להלן הפירוט, הקוד והוכחות ההרצה לכל תוכנית.
 
-### 🛠️ פונקציות (Functions)
-1. **`calculate_patient_risk_score`**: פונקציה המקבלת מזהה מטופל, רצה על כל המדדים הרפואיים שלו מהיממה האחרונה ומחשבת ציון סיכון.
-   * **אלמנטים שיושמו:** סמן מרומז (Implicit Cursor), משתנה מטיפוס `RECORD`, הסתעפויות (`IF/ELSIF`), זריקת שגיאות יזומה (`RAISE EXCEPTION`), ולולאות.
-2. **`get_active_critical_incidents`**: פונקציה המיועדת למערכת הניהול המרכזית, המחזירה מצביע לאוסף נתונים דינמי של אירועים קריטיים פעילים.
-   * **אלמנטים שיושמו:** החזרת מצביע לתוצאת שאילתה (`REF CURSOR`).
+---
 
-### ⚙️ פרוצדורות (Procedures)
-1. **`update_hospital_capacities`**: פרוצדורה העוברת על כל בתי החולים, סופרת את כמות ההעברות אליהם בשנה הנוכחית ומעדכנת אוטומטית את סטטוס התפוסה שלהם.
-   * **אלמנטים שיושמו:** סמן מפורש (`Explicit Cursor`), פקודות DML (`UPDATE`), לולאת `LOOP` עם תנאי עצירה, הסתעפויות וטיפול בשגיאות קריסה (`EXCEPTION`).
-2. **`cancel_stale_incidents`**: מערכת ארכיון וניקוי נתונים הסוגרת אירועי שווא ישנים (סטטוס Pending שהסתיימו) ומוחקת את נקודת הציון שלהם מהמפה כדי לא להעמיס על המוקדנים.
-   * **אלמנטים שיושמו:** ביצוע מספר פקודות DML ברצף (`UPDATE` ואחריו `DELETE`), סמן מרומז וטיפול בשגיאות.
+### 1. פונקציות (Functions)
 
-### 🛡️ טריגרים (Triggers)
-1. **`trg_verify_critical_closure` (בזמן `UPDATE`):** שומר סף לוגי המונע ממוקדן לשנות סטטוס של אירוע קריטי (חומרה 5) ל-`Resolved` אם אין במערכת תיעוד שבוצע בפועל פינוי לבית חולים עבור אירוע זה.
-2. **`trg_escalate_severity` (בזמן `INSERT/UPDATE`):** טריגר מבצעי היושב על טבלת המדדים הרפואיים. אם מוזן מדד קריטי חריג (כמו סטורציה נמוכה מ-85 או דופק גבוה), הטריגר מזהה לאיזה אירוע המדד שייך ומקפיץ אוטומטית את רמת החומרה של האירוע ל-5.
+#### 1.1 פונקציה לחישוב ציון סיכון (`calculate_patient_risk_score`)
+* **תיאור מילולי:** הפונקציה מקבלת מזהה מטופל (`Patient_ID_`), שולפת באמצעות סמן מרומז את כל המדדים הרפואיים שלו, ומחשבת "ציון סיכון" המבוסס על חריגות בסטורציה, דופק ולחץ דם. משתמשת בלולאות, הסתעפויות ומשתנה מטיפוס `RECORD`. אם לא נמצאו מדדים למטופל, נזרקת חריגה (Exception) יזומה.
+* **קוד הפונקציה:**
+```sql
+CREATE OR REPLACE FUNCTION calculate_patient_risk_score(p_patient_id INT)
+RETURNS INT AS $$
+DECLARE
+    v_risk_score INT := 0;
+    v_measurement RECORD; -- Explicit use of RECORD type to hold table rows
+    v_found_measurements BOOLEAN := FALSE;
+BEGIN
+    -- Implicit cursor using a FOR loop to iterate over patient measurements
+    FOR v_measurement IN (
+        SELECT Systolic_BP_, Diastolic_BP_, Pulse_, Oxygen_Saturation_
+        FROM MEDICAL_MEASUREMENTS
+        WHERE Patient_ID_ = p_patient_id
+    ) LOOP
+        v_found_measurements := TRUE;
 
-### 🚀 תוכניות ראשיות (Main Programs / Anonymous Blocks)
-נכתבו שני סקריפטים המשמשים כתוכניות ראשיות להרצה וזימון התוכניות, לשם סימולציה של המערכת:
-* **תוכנית ראשית 1:** מפעילה את פרוצדורת עדכון בתי החולים, ולאחר מכן מזמנת את פונקציית ציון הסיכון עבור מטופל ספציפי ומדפיסה את התוצאה למסך.
-* **תוכנית ראשית 2:** מריצה את פרוצדורת ניקוי אירועי השווא, ולאחר מכן קוראת לפונקציית ה-`REF CURSOR`, שואבת ממנו את הנתונים באמצעות לולאה ומדפיסה אותם אחד-אחד למסך הקונסולה.
+        -- Branching logic based on the oxygen saturation
+        IF v_measurement.Oxygen_Saturation_ < 90 THEN
+            v_risk_score := v_risk_score + 3;
+        ELSIF v_measurement.Oxygen_Saturation_ BETWEEN 90 AND 94 THEN
+            v_risk_score := v_risk_score + 1;
+        END IF;
+
+        -- Branching logic based on pulse abnormalities
+        IF v_measurement.Pulse_ > 120 OR v_measurement.Pulse_ < 50 THEN
+            v_risk_score := v_risk_score + 2;
+        END IF;
+
+        -- Branching logic based on high blood pressure
+        IF v_measurement.Systolic_BP_ > 180 OR v_measurement.Diastolic_BP_ > 110 THEN
+            v_risk_score := v_risk_score + 2;
+        END IF;
+    END LOOP;
+
+    -- Exception simulation: throw an error if no records exist for calculation
+    IF NOT v_found_measurements THEN
+        RAISE EXCEPTION 'No medical measurements found for patient %', p_patient_id;
+    END IF;
+
+    RETURN v_risk_score;
+
+EXCEPTION
+    WHEN OTHERS THEN
+        -- Handle unexpected errors gracefully and return a default score of 0
+        RAISE NOTICE 'Error in calculate_patient_risk_score: %', SQLERRM;
+        RETURN 0;
+END;
+$$ LANGUAGE plpgsql;
